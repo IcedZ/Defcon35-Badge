@@ -1,0 +1,26 @@
+# Arduino / build output
+build/
+*.bin
+*.elf
+*.map
+*.hex
+
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local AI-tooling config (machine-specific, keep out of the public repo)
+.claude/
+.trail/
+
+# Secrets
+secrets.h
+*.env
