@@ -11,6 +11,7 @@ built on the ESP32-S3.
 ```
 JC4827W543_HelloWorld/   Display bring-up + self-test (text, gradients, uptime)
 JC4827W543_Diag/         No-display diagnostic: blinks backlight, prints chip/PSRAM info
+JC4827W543_BLE_Proximity/ BLE proximity test: unique DC35-XXXXXX name, lists nearby badges + RSSI
 docs/
   hardware/
     JC4827W543.md        Prototype board pin map, Arduino setup, known gotchas
