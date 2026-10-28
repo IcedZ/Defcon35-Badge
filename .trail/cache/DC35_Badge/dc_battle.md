@@ -1,0 +1,40 @@
+# DC35_Badge/dc_battle.h
+
+- PeerInfo · class · L24-L32 — struct PeerInfo
+- class · type · L34-L144 — enum class Phase : uint8_t { IDLE, CHALLENGING, CHALLENGED, DECLINING, PICK, COMMIT, REVEAL, DONE };
+- BattleEventType · type · L36-L50 — enum BattleEventType : uint8_t
+- AbortReason · type · L52-L52 — enum AbortReason : uint8_t { AB_NONE, AB_SILENT, AB_LEFT, AB_STALLED };
+- BattleEvent · class · L54-L63 — struct BattleEvent
+- begin · function · L70-L70 — void begin(uint32_t myId, RandomFn rng);
+- setSelf · function · L73-L73 — void setSelf(uint8_t cls, uint8_t level, uint8_t hp, bool canBattle, uint8_t extraFlags);
+- challenge · function · L75-L75 — bool challenge(uint32_t peerId, const PeerInfo *peers, int n, uint32_t now);
+- respond · function · L76-L76 — bool respond(bool accept, uint32_t now);
+- chooseMove · function · L77-L77 — bool chooseMove(uint8_t move, uint32_t now);
+- tick · function · L79-L79 — void tick(uint32_t now, const PeerInfo *peers, int n);
+- buildFrame · function · L80-L80 — void buildFrame(AdvFrame &f) const;
+- pollEvent · function · L81-L81 — bool pollEvent(BattleEvent &e);
+- phase · function · L83-L83 — Phase    phase() const { return ph; }
+- inBattle · function · L84-L84 — bool     inBattle() const { return ph == Phase::PICK || ph == Phase::COMMIT || ph == Phase::REVEAL || ph == Phase::DONE; }
+- busy · function · L85-L85 — bool     busy() const { return ph != Phase::IDLE; }
+- needsMove · function · L86-L86 — bool     needsMove() const { return ph == Phase::PICK && myMove == MOVE_NONE; }
+- chosenMove · function · L87-L87 — uint8_t  chosenMove() const { return myMove; }
+- opponent · function · L88-L88 — uint32_t opponent() const { return oppId; }
+- round · function · L89-L89 — uint8_t  round() const { return rnd; }
+- deadline · function · L90-L90 — uint32_t deadline() const { return phaseDeadline; }
+- me · function · L91-L91 — const Fighter &me() const { return fMe; }
+- them · function · L92-L92 — const Fighter &them() const { return fOpp; }
+- myMaxHpAtStart · function · L93-L93 — uint8_t  myMaxHpAtStart() const { return startHpMe; }
+- oppMaxHpAtStart · function · L94-L94 — uint8_t  oppMaxHpAtStart() const { return startHpOpp; }
+- push · function · L131-L131 — void push(const BattleEvent &e);
+- ev · function · L132-L132 — BattleEvent ev(uint8_t type) const;
+- enter · function · L133-L133 — void enter(Phase p, uint32_t now, uint32_t timeout);
+- reset · function · L134-L134 — void reset(uint32_t now);
+- abort · function · L135-L135 — void abort(uint8_t reason, uint32_t now);
+- startBattle · function · L136-L136 — void startBattle(const AdvFrame &opp, uint32_t now);
+- startRound · function · L137-L137 — void startRound(uint32_t now);
+- makeCommit · function · L138-L138 — void makeCommit(uint8_t out[8], uint32_t whoId, uint8_t move, const uint8_t salt[7]) const;
+- engaged · function · L139-L139 — bool engaged(const PeerInfo *op) const;
+- peerAtLeast · function · L140-L140 — bool peerAtLeast(const PeerInfo *op, uint8_t state, uint8_t round) const;
+- takePeerReveal · function · L141-L141 — bool takePeerReveal(const PeerInfo *op, uint8_t &move, uint8_t salt[7]) const;
+- finishRound · function · L142-L142 — void finishRound(uint8_t peerMove, uint32_t now);
+- find · function · L143-L143 — const PeerInfo *find(const PeerInfo *peers, int n, uint32_t id) const;

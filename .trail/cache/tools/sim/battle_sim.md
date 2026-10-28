@@ -1,0 +1,36 @@
+# tools/sim/battle_sim.cpp
+
+- rngFn · function · L20-L20 — static uint32_t rngFn() { return engineRng(); }
+- SimBadge · class · L22-L40 — struct SimBadge
+- Sim · class · L42-L145 — struct Sim
+- Sim · function · L51-L55 — explicit Sim(uint32_t seed) : rnd(seed)
+- add · function · L57-L57 — SimBadge &add(uint32_t id)
+- init · function · L65-L68 — void init()
+- rand · function · L70-L70 — uint32_t rand(uint32_t n) { return n ? rnd() % n : 0; }
+- deliver · function · L72-L81 — void deliver(SimBadge &from, SimBadge &to, const AdvFrame &frame)
+- step · function · L83-L120 — void step(uint32_t dt = 5)
+- runFor · function · L122-L122 — void runFor(uint32_t ms) { uint32_t end = now + ms; while (now < end) step(); }
+- waitHeard · function · L125-L130 — void waitHeard(size_t i, size_t j, uint32_t maxMs = 20000)
+- allIdle · function · L132-L136 — bool allIdle() const
+- runUntilIdle · function · L138-L144 — void runUntilIdle(uint32_t maxMs)
+- countEv · function · L151-L156 — static int countEv(const SimBadge &x, uint8_t t)
+- lastEv · function · L158-L158 — static const BattleEvent *lastEv(const SimBadge &x, uint8_t t)
+- checkConsistent · function · L166-L188 — static void checkConsistent(SimBadge &A, SimBadge &B, const char *tag, uint32_t seed)
+- testSha · function · L191-L200 — static void testSha()
+- testRulesSymmetry · function · L202-L238 — static void testRulesSymmetry()
+- testNormal · function · L240-L258 — static void testNormal(double loss, int runs, const char *tag)
+- sim · function · L244-L244 — Sim sim(s);
+- testDecline · function · L260-L277 — static void testDecline()
+- sim · function · L264-L264 — Sim sim(s);
+- testNoAnswer · function · L279-L291 — static void testNoAnswer()
+- testSimultaneous · function · L293-L309 — static void testSimultaneous()
+- sim · function · L297-L297 — Sim sim(s);
+- testNoInput · function · L311-L324 — static void testNoInput()
+- testWalkAway · function · L326-L345 — static void testWalkAway()
+- sim · function · L330-L330 — Sim sim(s);
+- testCheat · function · L347-L373 — static void testCheat()
+- sim · function · L353-L353 — Sim sim(s);
+- testThreeBadges · function · L375-L395 — static void testThreeBadges()
+- sim · function · L380-L380 — Sim sim(s);
+- testProgression · function · L397-L463 — static void testProgression()
+- main · function · L465-L490 — int main()
