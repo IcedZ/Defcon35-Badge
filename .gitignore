@@ -5,6 +5,10 @@ build/
 *.map
 *.hex
 
+# PC simulator build output
+tools/sim/battle_sim
+tools/sim/battle_sim.exe
+
 # PlatformIO
 .pio/
 .pioenvs/
