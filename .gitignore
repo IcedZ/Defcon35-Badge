@@ -21,9 +21,11 @@ tools/sim/battle_sim.exe
 .DS_Store
 Thumbs.db
 
-# Local AI-tooling config (machine-specific, keep out of the public repo)
-.claude/
-.trail/
+# Claude Code + trail: shared hook settings (.claude/settings.json) and trail
+# learnings (.trail/learnings/) ARE committed so every session starts from them.
+# trail's cache and status line stay local via .trail/.gitignore.
+# Personal permissions stay local:
+.claude/settings.local.json
 
 # Secrets
 secrets.h

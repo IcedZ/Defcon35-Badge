@@ -69,10 +69,29 @@ struct Button
 static Button buttons[MAX_BUTTONS];
 static int    buttonCount = 0;
 
+// nearby-badge grid state (drawn further down, but needed by the hit test)
+#define GRID_COLS   4
+#define GRID_ROWS   2
+#define GRID_TILES  (GRID_COLS * GRID_ROWS)
+#define GRID_X      8
+#define GRID_Y      110
+#define TILE_W      112
+#define TILE_H      44
+#define TILE_GAP    4
+#define TILE_BG     0x18E3
+#define UI_CMD_PAGE 0xF0      // UI-internal: "MORE" tile flips the page
+
+enum TileKind : uint8_t { TILE_EMPTY, TILE_PEER, TILE_MORE };
+struct TileCache { bool valid; uint8_t kind; uint32_t id; uint8_t level, range, state; bool sel; int more; };
+static TileCache tiles[GRID_TILES];
+static int gridPage = 0, gridPeerCount = 0;
+static void invalidateTiles() { for (auto &tc : tiles) tc.valid = false; }
+
 static void invalidate()
 {
   for (auto &s : slots) { s.text[0] = 1; s.text[1] = 0; s.fg = 0; }   // never matches real text
   for (auto &b : buttons) b.drawn = false;
+  invalidateTiles();
 }
 
 // Visible button. Disabled buttons are drawn grey and ignore taps.
@@ -117,6 +136,13 @@ bool uiHitTest(int16_t x, int16_t y, Command &c)
     Button &b = buttons[i];
     if (!b.enabled || b.cmd == CMD_NONE) continue;
     if (x < b.x || x >= b.x + b.w || y < b.y || y >= b.y + b.h) continue;
+    if (b.cmd == UI_CMD_PAGE)   // "MORE" tile: next page of the grid, handled here
+    {
+      gridPage++;
+      if (gridPage * (GRID_TILES - 1) >= gridPeerCount) gridPage = 0;
+      invalidateTiles();
+      return false;
+    }
     c.type = b.cmd;
     c.arg = b.arg;
     if (b.label[0])   // flash visible buttons as feedback; redrawn on next frame
@@ -134,6 +160,103 @@ void uiDebugDot(int16_t x, int16_t y)
   gfx->drawFastHLine(x - 8, y, 17, UI_RED);
   gfx->drawFastVLine(x, y - 8, 17, UI_RED);
   gfx->fillCircle(x, y, 2, UI_YELLOW);
+}
+
+// ---------------------------------------------------------------------------
+// nearby-badge grid: 4 x 2 tiles, each with a unique identicon
+// ---------------------------------------------------------------------------
+
+static uint32_t mix32(uint32_t x)
+{
+  x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0x846ca68b; x ^= x >> 16;
+  return x;
+}
+
+// 5x5 mirrored pixel pattern + color, both derived from the badge ID, so
+// every badge gets its own recognizable icon (same on every screen).
+static void identicon(int16_t x, int16_t y, int cell, uint32_t id, bool dim)
+{
+  static const uint16_t pal[] = {0xF800, 0xFD20, 0xFFE0, 0x07E0, 0x07FF, 0x041F,
+                                 0x781F, 0xF81F, 0xFB56, 0x5FE0, 0x2D7F, 0xFC08};
+  uint32_t h = mix32(id ^ 0x9E3779B9);
+  if ((h & 0x7FFF) == 0) h |= 0x2492;                 // never an empty icon
+  uint16_t c = dim ? MIDGREY : pal[(h >> 20) % 12];
+  gfx->fillRect(x, y, 5 * cell, 5 * cell, BG);
+  for (int r = 0; r < 5; r++)
+    for (int col = 0; col < 3; col++)
+      if ((h >> (r * 3 + col)) & 1)
+      {
+        gfx->fillRect(x + col * cell, y + r * cell, cell, cell, c);
+        gfx->fillRect(x + (4 - col) * cell, y + r * cell, cell, cell, c);
+      }
+}
+
+static void tileXY(int i, int16_t &x, int16_t &y)
+{
+  x = GRID_X + (i % GRID_COLS) * (TILE_W + TILE_GAP);
+  y = GRID_Y + (i / GRID_COLS) * (TILE_H + TILE_GAP);
+}
+
+static void drawTile(int i, const PeerInfo *q, bool sel, uint8_t kind, int more)
+{
+  uint8_t range = 0, state = 0, level = 0;
+  uint32_t id = 0;
+  if (kind == TILE_PEER)
+  {
+    id = q->id;
+    level = q->f.level;
+    range = q->rssiAvg >= RSSI_CLOSE ? 0 : (q->rssiAvg >= RSSI_NEAR ? 1 : 2);
+    state = (q->f.flags & FLAG_KO) ? 2 : ((q->f.flags & FLAG_BUSY) ? 1 : 0);
+  }
+  TileCache &tc = tiles[i];
+  if (tc.valid && tc.kind == kind && tc.id == id && tc.level == level && tc.range == range &&
+      tc.state == state && tc.sel == sel && tc.more == more) return;
+  tc = {true, kind, id, level, range, state, sel, more};
+
+  int16_t x, y;
+  tileXY(i, x, y);
+  gfx->fillRect(x, y, TILE_W, TILE_H, BG);
+  if (kind == TILE_EMPTY) return;
+
+  if (kind == TILE_MORE)
+  {
+    gfx->fillRoundRect(x, y, TILE_W, TILE_H, 6, TILE_BG);
+    gfx->drawRoundRect(x, y, TILE_W, TILE_H, 6, UI_GREY);
+    gfx->setTextSize(2);
+    gfx->setTextColor(UI_WHITE, TILE_BG);
+    gfx->setCursor(x + 32, y + 6);
+    gfx->print("MORE");
+    gfx->setTextSize(1);
+    gfx->setTextColor(UI_GREY, TILE_BG);
+    gfx->setCursor(x + 34, y + 28);
+    gfx->printf("+%d badges", more);
+    return;
+  }
+
+  bool dim = state != 0;
+  static const uint16_t rangeCol[3] = {UI_GREEN, UI_YELLOW, UI_GREY};
+  uint16_t border = sel ? UI_WHITE : (dim ? MIDGREY : rangeCol[range]);
+  gfx->fillRoundRect(x, y, TILE_W, TILE_H, 6, TILE_BG);
+  gfx->drawRoundRect(x, y, TILE_W, TILE_H, 6, border);
+  if (sel)
+  {
+    gfx->drawRoundRect(x + 1, y + 1, TILE_W - 2, TILE_H - 2, 5, border);
+    gfx->drawRoundRect(x + 2, y + 2, TILE_W - 4, TILE_H - 4, 4, border);
+  }
+  identicon(x + 5, y + 9, 5, id, dim);   // 25x25, vertically centred
+
+  char hex[8];
+  snprintf(hex, sizeof(hex), "%06lX", (unsigned long)(id & 0xFFFFFF));
+  gfx->setTextSize(2);
+  gfx->setTextColor(dim ? UI_GREY : UI_WHITE, TILE_BG);
+  gfx->setCursor(x + 35, y + 7);
+  gfx->print(hex);
+
+  static const char *rangeTxt[3] = {"CLOSE", "NEAR", "FAR"};
+  gfx->setTextSize(1);
+  gfx->setTextColor(dim ? UI_GREY : rangeCol[range], TILE_BG);
+  gfx->setCursor(x + 35, y + 29);
+  gfx->printf("LV%-2u %s", level, state == 2 ? "KO" : (state == 1 ? "BUSY" : rangeTxt[range]));
 }
 
 // ---------------------------------------------------------------------------
@@ -184,16 +307,6 @@ static uint16_t hpColor(int hp, int maxHp)
   return UI_RED;
 }
 
-static const char *rangeLabel(float rssi)
-{
-  return rssi >= RSSI_CLOSE ? "CLOSE" : (rssi >= RSSI_NEAR ? "NEAR" : "FAR");
-}
-
-static uint16_t rangeColor(float rssi)
-{
-  return rssi >= RSSI_CLOSE ? UI_GREEN : (rssi >= RSSI_NEAR ? UI_YELLOW : UI_GREY);
-}
-
 static void header(uint16_t color)
 {
   gfx->fillRect(0, 0, SCREEN_W, 30, color);
@@ -211,8 +324,8 @@ static void setScreen(Screen s)
 // ---------------------------------------------------------------------------
 // screens
 // ---------------------------------------------------------------------------
-//  HOME   0 header | 38 hearts | 62 XP | 92 nearby list (4 rows, tap to select)
-//         204 status | 226 [CHALLENGE] [AUTO] [BRIGHT n]
+//  HOME   0 header | 36 hearts | 62 XP | 90 nearby grid (4 x 2 tiles, tap to select)
+//         206 status | 226 [CHALLENGE] [AUTO] [BRIGHT n]
 static void drawHome(const UiModel &m)
 {
   static int lastXp = -1, lastXpNext = -1;
@@ -247,37 +360,81 @@ static void drawHome(const UiModel &m)
     lastXp = p.xp; lastXpNext = next;
   }
 
-  line(4, 10, 92, UI_CYAN, BG, 39, "NEARBY (%d)  tap one, then CHALLENGE", m.peerCount);
+  line(4, 10, 90, UI_CYAN, BG, 39, "NEARBY (%d)  tap one, then CHALLENGE", m.peerCount);
 
-  const int rows = 4;
+  // Stable order (first seen) so tiles don't jump around as signal strength
+  // fluctuates; the border color shows range instead.
+  const PeerInfo *order[MAX_PEERS];
+  int n = 0;
   bool selectedVisible = false;
-  for (int i = 0; i < rows; i++)
+  for (int i = 0; i < m.peerCount && n < MAX_PEERS; i++)
   {
-    int16_t y = 112 + i * 22;
-    if (i < m.peerCount)
+    order[n++] = &m.peers[i];
+    if (m.peers[i].id == m.selectedId) selectedVisible = true;
+  }
+  for (int i = 1; i < n; i++)
+  {
+    const PeerInfo *k = order[i];
+    int j = i - 1;
+    while (j >= 0 && (order[j]->firstSeen > k->firstSeen ||
+                      (order[j]->firstSeen == k->firstSeen && order[j]->id > k->id)))
     {
-      const PeerInfo &q = m.peers[i];
-      char nm[16];
-      badgeName(q.id, nm);
-      bool sel = q.id == m.selectedId;
-      if (sel) selectedVisible = true;
-      const char *st = (q.f.flags & FLAG_KO) ? "KO" : ((q.f.flags & FLAG_BUSY) ? "BUSY" : "");
-      uint16_t c = sel ? UI_WHITE : (st[0] ? UI_GREY : rangeColor(q.rssiAvg));
-      line(5 + i, 10, y + 3, c, BG, 39, "%c%d %-11s LV%-2u %4d %-5s %s",
-           sel ? '>' : ' ', i + 1, nm, q.f.level, (int)lroundf(q.rssiAvg),
-           rangeLabel(q.rssiAvg), st);
-      hotspot(4 + i, 0, y, SCREEN_W, 22, CMD_SELECT, (int32_t)q.id);
+      order[j + 1] = order[j];
+      j--;
+    }
+    order[j + 1] = k;
+  }
+
+  // Empty grid shows a message; when the first badge appears, wipe it and
+  // force every tile to redraw over that area.
+  static bool showingEmpty = false;
+  if (fresh) showingEmpty = false;   // screen was just cleared
+  if (n == 0 && !showingEmpty)
+  {
+    gfx->fillRect(GRID_X, GRID_Y, GRID_COLS * (TILE_W + TILE_GAP), GRID_ROWS * (TILE_H + TILE_GAP), BG);
+    for (auto &tc : tiles) tc = {true, TILE_EMPTY, 0, 0, 0, 0, false, 0};   // already blank: don't redraw over the message
+    gfx->setTextSize(2);
+    gfx->setTextColor(UI_GREY, BG);
+    gfx->setCursor(GRID_X + 124, GRID_Y + 40);
+    gfx->print("No badges in range");
+    showingEmpty = true;
+  }
+  else if (n > 0 && showingEmpty)
+  {
+    gfx->fillRect(GRID_X, GRID_Y, GRID_COLS * (TILE_W + TILE_GAP), GRID_ROWS * (TILE_H + TILE_GAP), BG);
+    invalidateTiles();
+    showingEmpty = false;
+  }
+
+  // Up to 8 tiles; with more badges, the last tile is "MORE" and pages through.
+  gridPeerCount = n;
+  bool paged = n > GRID_TILES;
+  int perPage = paged ? GRID_TILES - 1 : GRID_TILES;
+  if (gridPage * perPage >= n) gridPage = 0;
+  int start = gridPage * perPage;
+  for (int i = 0; i < GRID_TILES; i++)
+  {
+    int16_t x, y;
+    tileXY(i, x, y);
+    int idx = start + i;
+    if (paged && i == GRID_TILES - 1)
+    {
+      drawTile(i, nullptr, false, TILE_MORE, n - perPage);
+      hotspot(4 + i, x, y, TILE_W, TILE_H, UI_CMD_PAGE, 0);
+    }
+    else if (i < perPage && idx < n)
+    {
+      drawTile(i, order[idx], order[idx]->id == m.selectedId, TILE_PEER, 0);
+      hotspot(4 + i, x, y, TILE_W, TILE_H, CMD_SELECT, (int32_t)order[idx]->id);
     }
     else
     {
-      line(5 + i, 10, y + 3, UI_GREY, BG, 39, i == 0 ? "   (no badges in range)" : "");
-      hotspot(4 + i, 0, y, SCREEN_W, 22, CMD_NONE, 0, false);
+      drawTile(i, nullptr, false, TILE_EMPTY, 0);
+      hotspot(4 + i, x, y, TILE_W, TILE_H, CMD_NONE, 0, false);
     }
   }
-  if (m.peerCount > rows) line(9, 10, 112 + rows * 22 - 1, UI_GREY, BG, 39, "   +%d more (Serial: list)", m.peerCount - rows);
-  else line(9, 10, 112 + rows * 22 - 1, UI_GREY, BG, 39, "");
 
-  line(10, 10, 204, m.statusColor, BG, 39, "%s", m.status);
+  line(10, 10, 206, m.statusColor, BG, 39, "%s", m.status);
 
   bool canChallenge = selectedVisible && !m.eng->busy() && playerCanBattle(p);
   button(0, 8, 226, 222, 42, "CHALLENGE", DKRED, canChallenge, CMD_CHALLENGE, CMD_ID_FLAG | (int32_t)m.selectedId);

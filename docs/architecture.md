@@ -37,7 +37,13 @@ Touch, Serial and the BOOT button all produce the same `Command` values
   `uiHitTest()`. The UI owns the button layout, so a button's position and its
   action are defined in one place.
 * **On-screen buttons:**
-  * Home: tap a badge row to select it, then **CHALLENGE**. **AUTO** toggles
+  * Home: nearby badges appear as a 4 × 2 grid of tiles. Each tile has a unique
+    identicon (a pixel pattern and colour derived from the badge ID, so a badge
+    looks the same on every screen), its ID, level and range. The border colour
+    shows range, and BUSY/KO badges are greyed out. Tiles keep a stable order
+    (first seen), so they don't jump as signal strength changes. With more than
+    8 badges, the last tile becomes **MORE** and pages through the rest. Tap a
+    tile to select it (thick white border), then **CHALLENGE**. **AUTO** toggles
     auto-play. **BRIGHT n** cycles display brightness 1–5 (PWM backlight). The
     level is saved and survives power-off and `factory-reset`. Lower levels
     noticeably extend battery life, since the backlight is the biggest draw.

@@ -25,7 +25,7 @@ docs/
 Flash it with the same Tools settings as the test sketches; no extra libraries
 are needed. Play with the touch screen (resistive, so press firmly):
 
-- Tap a nearby badge, then **CHALLENGE**; the other badge taps **ACCEPT** or **DECLINE**
+- Tap a badge tile in the nearby grid, then **CHALLENGE**; the other badge taps **ACCEPT** or **DECLINE**
 - Tap **STRIKE** / **BLOCK** / **CHARGE** each round (first to land 2 hits wins)
 - **AUTO** (or holding BOOT 1.5 s) lets a second board play by itself
 - **BRIGHT** cycles screen brightness 1–5 (saved; dimmer = longer battery life)
